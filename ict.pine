@@ -1,0 +1,78 @@
+// This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © vitahoang
+
+//@version=5
+indicator(title = "ICT Test", shorttitle = "ICTT", overlay = true )
+
+
+//––––––––––––––––––––CONSTANT––––––––––––––––––––
+
+
+//––––––––––––––––––––INPUT––––––––––––––––––––
+nyOpenColor = input.color(color.gray, "NY Open Color")
+nyLookBack = input.int(7, "Look Back Period")
+isEma = input.bool(false, "Show EMA")
+nyOpen = input.session("0000-0005", "NY Open")
+
+
+//––––––––––––––––––––FUNCTION––––––––––––––––––––
+
+// Function returns `true` when the bar is in the session
+barInRange(tf, session) =>
+    time(tf, session) != 0
+    
+// Function returns `true` if timeframe is between
+ifMinuteBetween(lowerMinute, upperMinute) =>
+    timeframe.isintraday and timeframe.multiplier >= lowerMinute and timeframe.multiplier <= upperMinute
+
+// Function to draw a vertical line 
+drawVerticalLine(targetTime, lineStyle) =>
+    line.new(x1=targetTime, y1=low, x2=targetTime, y2=high, xloc=xloc.bar_time, extend=extend.both, color=color.gray, style=lineStyle, width=0)
+
+// Function to debug
+print(txt) =>
+    // Create label on the first bar.
+    var lbl = label.new(bar_index, na, txt, xloc.bar_index, yloc.price, color(na), label.style_none, color.gray, size.large, text.align_left)
+    // On next bars, update the label's x and y position, and the text it displays.
+    label.set_xy(lbl, bar_index, ta.highest(10)[1])
+    label.set_text(lbl, txt)
+
+// ––––––––––––––––––––MAIN––––––––––––––––––––
+
+// Plot ema
+plot(isEma ? ta.ema(close, 34) : na, color = color.orange, editable = false)
+plot(isEma ? ta.ema(close, 89) : na, color = color.blue, editable = false)
+plot(isEma ? ta.ema(close, 200) : na, color = color.gray, linewidth = 3, editable = false)
+
+
+// Draw New York Session vetical line 
+i = 0
+while i < nyLookBack 
+    targetTime0 = if ifMinuteBetween(0,59)
+        timestamp("UTC-5", year, month, dayofmonth, 00, 00, 00) - 3600000 * 24 * i
+    drawVerticalLine(targetTime0, line.style_dashed)
+
+    targetTime1 = if ifMinuteBetween(0,59)
+        timestamp("UTC-5", year, month, dayofmonth, 08, 30, 00) - 3600000 * 24 * i
+    drawVerticalLine(targetTime1, line.style_dotted)
+
+    targetTime2 = if ifMinuteBetween(0,59)
+        timestamp("UTC-5", year, month, dayofmonth, 12, 00, 00) - 3600000 * 24 * i
+    drawVerticalLine(targetTime2, line.style_dotted)
+
+    targetTime3 = if ifMinuteBetween(0,59)
+        timestamp("UTC-5", year, month, dayofmonth, 13, 00, 00) - 3600000 * 24 * i
+    drawVerticalLine(targetTime3, line.style_dotted)
+
+    targetTime4 = if ifMinuteBetween(0,59)
+        timestamp("UTC-5", year, month, dayofmonth, 16, 30, 00) - 3600000 * 24 * i
+    drawVerticalLine(targetTime4, line.style_dotted)
+    i+= 1
+
+// Draw New York Open 
+nymTime = if ifMinuteBetween(0,59)
+    timestamp("UTC-5", year, month, dayofmonth, 00, 00, 00) 
+
+nymBar = (time - nymTime) / (1000 * timeframe.in_seconds(timeframe.period))
+print("nymBar:" + str.tostring(nymBar))
+nymLine = line.new(x1=nymTime, y1=low[nymBar], x2=time, y2=low[nymBar], xloc=xloc.bar_time, color=color.gray, style=line.style_solid, width=1)
