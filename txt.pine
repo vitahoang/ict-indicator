@@ -1,83 +1,82 @@
-//Main Session 3
-var GRP3 = "Session 3"
-rangeTime3 = input.session(title='Session Time', defval='0700-1615', group=GRP3)
+drawSessionBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
+    inSession = not na(time(timeframe.period, rangeTime, utcOffset))
+    inExtend = not na(time(timeframe.period, rangeTime, utcOffset))
+    startTime = 0
+    startTime := inSession and not inSession[1] ? time : startTime[1]
 
-boxLineColor3 = input(color.green, 'Box and H/L Line Color', group=GRP3)
-middleLineColor3 = input(color.green, 'Middle Line Color', group=GRP3)
-bgColor3 = input(color.new(color.green, 90), 'Box Background Color', group=GRP3)
+    //Box lines
+    var line lowHline = na
+    var line topHline = na
+    var line leftVline = na
+    var line rightVline = na
+    var line middleHline = na
+    var box bgBox = na
+    var label sLable = na
+
+    var low_val = 0.0
+    var high_val = 0.0
+    var open_val = 0.0
+    if inSession and not inSession[1]
+        low_val := low
+        high_val := high
+        open_val := open
+        high_val
+
+    // Plot lines
+    if inSession and ifMinuteBetween(1,59)
+        if inSession[1]
+            line.delete(lowHline)
+            line.delete(topHline)
+            line.delete(leftVline)
+            line.delete(rightVline)
+            line.delete(middleHline)
+            box.delete(bgBox)
+            label.delete(sLable)
+            
+
+        if low < low_val
+            low_val := low
+            low_val
+        if high > high_val
+            high_val := high
+            high_val
+
+        //Create Box
+        //x1, y1, x2, y2
+        if showBackground
+            bgBox := fillSessionBox(startTime, high_val, low_val, bgColor)
+
+        if showLines
+            lowHline := drawSessionHline(startTime, low_val, boxLineColor)
+            topHline := drawSessionHline(startTime, high_val, boxLineColor)
+            if showVlines
+                leftVline := line.new(startTime, high_val, startTime, low_val, xloc=xloc.bar_time, color=boxLineColor, style=line.style_solid, width=linesWidth)
+                rightVline := line.new(time, high_val, time, low_val, xloc=xloc.bar_time, color=boxLineColor, style=line.style_solid, width=linesWidth)
+            if showMiddleLine
+                middleHline := drawSessionMline(startTime, high_val, low_val, middleLineColor)
+        if showLable
+            sLable := drawSessionLabel(startTime, high_val, sessLable, boxLineColor)
+
+    else
+        if inExtend and extendLines and not inSession and timeframe.isminutes
+            time1 = line.get_x1(lowHline)
+            time2 = line.get_x2(lowHline)
+            price = line.get_y1(lowHline)
+            line.delete(lowHline)
+            lowHline := drawSessionHline(time1, price, boxLineColor)
+            
+            time1 := line.get_x1(topHline)
+            time2 := line.get_x2(topHline)
+            price := line.get_y1(topHline)
+            line.delete(topHline)
+            topHline := drawSessionHline(time1, price, boxLineColor)
+
+            time1 := line.get_x1(middleHline)
+            time2 := line.get_x2(middleHline)
+            price := line.get_y1(middleHline)
+            line.delete(middleHline)
+            middleHline := drawSessionMline(time1, price, price, middleLineColor)
+            middleHline
 
 
-
-inSession3 = not na(time(timeframe.period, rangeTime3))
-inExtend3 = not na(time(timeframe.period, extendTime))
-
-startTime3 = 0
-startTime3 := inSession3 and not inSession3[1] ? time : startTime3[1]
-
-//Box lines
-var line lowHline3 = na
-var line topHline3 = na
-var line leftVline3 = na
-var line rightVline3 = na
-var line middleHline3 = na
-var box bgBox3 = na
-
-var low_val3 = 0.0
-var high_val3 = 0.0
-if inSession3 and not inSession3[1]
-    low_val3 := low
-    high_val3 := high
-    high_val3
-
-// Plot lines
-if inSession3 and timeframe.isintraday
-    if inSession3[1]
-        line.delete(lowHline3)
-        line.delete(topHline3)
-        line.delete(leftVline3)
-        line.delete(rightVline3)
-        line.delete(middleHline3)
-        box.delete(bgBox3)
-
-    if low < low_val3
-        low_val3 := low
-        low_val3
-    if high > high_val3
-        high_val3 := high
-        high_val3
-
-    //Create Box
-    //x1, y1, x2, y2
-    if showBackground
-        bgBox3 := fillSessionBox(startTime3, high_val3, low_val3, bgColor3)
-
-    if showLines
-        lowHline3 := drawSessionHline(startTime3, low_val3, boxLineColor3)
-        topHline3 := drawSessionHline(startTime3, high_val3, boxLineColor3)
-        if showVlines
-            leftVline3 := line.new(startTime3, high_val3, startTime3, low_val3, xloc=xloc.bar_time, color=boxLineColor3, style=line.style_solid, width=linesWidth)
-            rightVline3 := line.new(time, high_val3, time, low_val3, xloc=xloc.bar_time, color=boxLineColor3, style=line.style_solid, width=linesWidth)
-        if showMiddleLine
-            middleHline3 := drawSessionMline(startTime3, high_val3, low_val3, middleLineColor3)
-
-else
-    if inExtend3 and extendLines and not inSession3 and timeframe.isintraday
-        time1 = line.get_x1(lowHline3)
-        time2 = line.get_x2(lowHline3)
-        price = line.get_y1(lowHline3)
-        line.delete(lowHline3)
-        lowHline3 := drawSessionHline(time1, price, boxLineColor3)
-        
-        time1 := line.get_x1(topHline3)
-        time2 := line.get_x2(topHline3)
-        price := line.get_y1(topHline3)
-        line.delete(topHline3)
-        topHline3 := drawSessionHline(time1, price, boxLineColor3)
-
-        time1 := line.get_x1(middleHline3)
-        time2 := line.get_x2(middleHline3)
-        price := line.get_y1(middleHline3)
-        line.delete(middleHline3)
-        middleHline3 := drawSessionMline(time1, price, price, middleLineColor3)
-        middleHline3
-
+drawSessionBox(rangeTime1, sessLable1, boxLineColor1, middleLineColor1, bgColor1)
