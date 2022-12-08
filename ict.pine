@@ -1,7 +1,7 @@
 //@version=5
 
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © vitahoang
+// © Nephew_Sam_
 indicator('ICT PD Intraday', overlay=true, max_bars_back=1000, max_labels_count=200, max_lines_count=200, max_boxes_count=200)
 
 //––––––––––––––––––––CONSTANTS––––––––––––––––––––
@@ -51,20 +51,23 @@ tdoOffset = input.int(0, "UTC Timezone offset (in hours)", minval = -12, maxval 
 // Main
 inTDO = hour == 5-hoursOffset-tdoOffset and minute == 0-minutesOffset and second == 0
 
-var line[] l1 = array.new_line(0)
-var label[] la1 = array.new_label(0)
+var line[] tdoHline = array.new_line(0)
+var line[] tdoVline = array.new_line(0)
+var label[] tdoLabel = array.new_label(0)
 
 
 if inTDO and not inTDO[1] and tdoShow
-    array.push(l1, line.new(time, open, time + _24H, open, xloc=xloc.bar_time, color=tdoColor, style = line.style_dashed, width=linesWidth))
+    array.push(tdoHline, line.new(time, open, time + _24H, open, xloc=xloc.bar_time, color=tdoColor, style = line.style_solid, width=linesWidth))
+    array.push(tdoVline, line.new(time, open, time, close, xloc=xloc.bar_time, extend=extend.both,color=tdoColor, style = line.style_dashed, width=linesWidth))
     if showLable
-        array.push(la1, label.new(time + _24H, open + open/LABEL_OFFSET_Y, tdoText, xloc=xloc.bar_time, style=label.style_none, size=labelSize, textcolor=tdoColor))
+        array.push(tdoLabel, label.new(time + _24H, open + open/LABEL_OFFSET_Y, tdoText, xloc=xloc.bar_time, style=label.style_none, size=labelSize, textcolor=tdoColor))
     
 
 // Delete lines if more than max
-if array.size(l1) > MAX_LINES
-    line.delete(array.shift(l1))
-    label.delete(array.shift(la1))
+if array.size(tdoHline) > MAX_LINES
+    line.delete(array.shift(tdoHline))
+    line.delete(array.shift(tdoVline))
+    label.delete(array.shift(tdoLabel))
 
 
 //––––––––––––––––––––SESSION––––––––––––––––––––
@@ -72,6 +75,8 @@ if array.size(l1) > MAX_LINES
 var grpss = 'Session Settings'
 showLines = input(title='Show Lines ?', defval=true, group=grpss)
 showVlines = input(title='Show VLines ?', defval=false, group=grpss)
+extendVlines = input(title='Extend VLines ?', defval=false, group=grpss)
+showOpenLine = input(title='Show Open Line ?', defval=true, group=grpss)
 showMiddleLine = input(title='Show Middle Line ?', defval=true, group=grpss)
 extendLines = input(title='Extend Lines ?', defval=false, group=grpss)
 extendTime = input.session(title='Extended Lines Time', defval='0300-1659', group=grpss)
@@ -79,23 +84,26 @@ showBackground = input(title='Show Background ?', defval=false, group=grpss)
 
 
 // Functions
-fillSessionBox (startTime, high_val, low_val, _color)=> 
+fillSessBox (startTime, high_val, low_val, _color)=> 
     box.new(startTime, high_val, time, low_val, xloc=xloc.bar_time, bgcolor=_color, border_width=0)
 
-drawSessionHline (startTime, y_val, _color) =>
+drawSessHline (startTime, y_val, _color) =>
     line.new(startTime, y_val, time, y_val, xloc=xloc.bar_time, color=_color, style=line.style_solid, width=linesWidth)
 
-drawSessionMline (startTime, high_val, low_val, _color) =>
+drawSessVline (_x1, _y1, _x2, _y2) =>
+    line.new(_x1, _y1, _x2, _y2, xloc=xloc.bar_time, extend = extendVlines ? extend.both : extend.none ,color=color.gray, style=line.style_dotted, width=linesWidth)
+
+drawSessMline (startTime, high_val, low_val, _color) =>
     line.new(startTime, (high_val + low_val) / 2, time, (high_val + low_val) / 2, xloc=xloc.bar_time, color=_color, style=line.style_dotted, width=linesWidth)
 
-drawSessionLabel (startTime, high_val, sessLable ,_color) =>
+drawSessLabel (startTime, high_val, sessLable ,_color) =>
     label.new(x = startTime, y = high_val + high_val/LABEL_OFFSET_Y, text = sessLable, xloc = xloc.bar_time, style=label.style_none, size=labelSize, textcolor = _color)
     
-ifMinuteBetween(lowerMinute, upperMinute) =>
+isTfBetweenMins(lowerMinute, upperMinute) =>
     timeframe.isintraday and timeframe.multiplier >= lowerMinute and timeframe.multiplier <= upperMinute
 
 
-drawSessionBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
+drawSessBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
     inSession = not na(time(timeframe.period, rangeTime, utcOffset))
     inExtend = not na(time(timeframe.period, rangeTime, utcOffset))
     startTime = 0
@@ -107,6 +115,7 @@ drawSessionBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
     var line leftVline = na
     var line rightVline = na
     var line middleHline = na
+    var line openHline = na
     var box bgBox = na
     var label sLable = na
 
@@ -120,7 +129,7 @@ drawSessionBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
         high_val
 
     // Plot lines
-    if inSession and ifMinuteBetween(1,59)
+    if inSession and isTfBetweenMins(1,59)
         if inSession[1]
             label.delete(sLable)
             line.delete(lowHline)
@@ -128,6 +137,7 @@ drawSessionBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
             line.delete(leftVline)
             line.delete(rightVline)
             line.delete(middleHline)
+            line.delete(openHline)
             box.delete(bgBox)
             high_val
 
@@ -141,22 +151,25 @@ drawSessionBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
         //Create Box
         //x1, y1, x2, y2
         if showBackground
-            bgBox := fillSessionBox(startTime, high_val, low_val, bgColor)
+            bgBox := fillSessBox(startTime, high_val, low_val, bgColor)
             high_val
 
         if showLines
-            lowHline := drawSessionHline(startTime, low_val, boxLineColor)
-            topHline := drawSessionHline(startTime, high_val, boxLineColor)
+            lowHline := drawSessHline(startTime, low_val, boxLineColor)
+            topHline := drawSessHline(startTime, high_val, boxLineColor)
             if showVlines
-                leftVline := line.new(startTime, high_val, startTime, low_val, xloc=xloc.bar_time, color=boxLineColor, style=line.style_solid, width=linesWidth)
-                rightVline := line.new(time, high_val, time, low_val, xloc=xloc.bar_time, color=boxLineColor, style=line.style_solid, width=linesWidth)
+                leftVline := drawSessVline(startTime, high_val, startTime, low_val)
+                rightVline := drawSessVline(time, high_val, time, low_val)
                 high_val
             if showMiddleLine
-                middleHline := drawSessionMline(startTime, high_val, low_val, middleLineColor)
+                middleHline := drawSessMline(startTime, high_val, low_val, middleLineColor)
+                high_val
+            if showOpenLine
+                openHline := drawSessHline(startTime, open_val, boxLineColor)
                 high_val
             high_val
         if showLable
-            sLable := drawSessionLabel(startTime, high_val, sessLable, boxLineColor)
+            sLable := drawSessLabel(startTime, high_val, sessLable, boxLineColor)
             high_val
 
     else
@@ -165,58 +178,57 @@ drawSessionBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
             time2 = line.get_x2(lowHline)
             price = line.get_y1(lowHline)
             line.delete(lowHline)
-            lowHline := drawSessionHline(time1, price, boxLineColor)
+            lowHline := drawSessHline(time1, price, boxLineColor)
             
             time1 := line.get_x1(topHline)
             time2 := line.get_x2(topHline)
             price := line.get_y1(topHline)
             line.delete(topHline)
-            topHline := drawSessionHline(time1, price, boxLineColor)
+            topHline := drawSessHline(time1, price, boxLineColor)
 
             time1 := line.get_x1(middleHline)
             time2 := line.get_x2(middleHline)
             price := line.get_y1(middleHline)
             line.delete(middleHline)
-            middleHline := drawSessionMline(time1, price, price, middleLineColor)
+            middleHline := drawSessMline(time1, price, price, middleLineColor)
             high_val
-
 
 //Main Session 1
 var GRP1 = "Session 1"
-rangeTime1 = input.session(title='Session Time', defval='0000-0600', group=GRP1)
+rangeTime1 = input.session(title='Session Time', defval='0000-0605', group=GRP1)
 sessLable1 = input.string(defval = "ASIA", title = "Name", group = GRP1) 
 boxLineColor1 = input(color.blue, 'Box and H/L Line Color', group=GRP1)
 middleLineColor1 = input(color.blue, 'Middle Line Color', group=GRP1)
 bgColor1 = input(color.new(color.aqua, 90), 'Box Background Color', group=GRP1)
 
-drawSessionBox(rangeTime1, sessLable1, boxLineColor1, middleLineColor1, bgColor1)
+drawSessBox(rangeTime1, sessLable1, boxLineColor1, middleLineColor1, bgColor1)
 
 //Main Session 2
 var GRP2 = "Session 2"
-rangeTime2 = input.session(title='Session Time', defval='0700-1600', group=GRP2)
+rangeTime2 = input.session(title='Session Time', defval='0700-1605', group=GRP2)
 sessLable2 = input.string(defval = "LONDON", title = "Name", group = GRP2)
 boxLineColor2 = input(color.green, 'Box and H/L Line Color', group=GRP2)
 middleLineColor2 = input(color.green, 'Middle Line Color', group=GRP2)
 bgColor2 = input(color.new(color.green, 90), 'Box Background Color', group=GRP2)
 
-drawSessionBox(rangeTime2, sessLable2, boxLineColor2, middleLineColor2, bgColor2)
+drawSessBox(rangeTime2, sessLable2, boxLineColor2, middleLineColor2, bgColor2)
 
 //Main Session 3
 var GRP3 = "Session 3"
-rangeTime3 = input.session(title='Session Time', defval='1300-1700', group=GRP3)
+rangeTime3 = input.session(title='Session Time', defval='1300-1705', group=GRP3)
 sessLable3 = input.string(defval = "NEWYORK AM", title = "Name", group = GRP3)
 boxLineColor3 = input(color.red, 'Box and H/L Line Color', group=GRP3)
 middleLineColor3 = input(color.red, 'Middle Line Color', group=GRP3)
 bgColor3 = input(color.new(color.red, 90), 'Box Background Color', group=GRP3)
 
-drawSessionBox(rangeTime3, sessLable3, boxLineColor3, middleLineColor3, bgColor3)
+drawSessBox(rangeTime3, sessLable3, boxLineColor3, middleLineColor3, bgColor3)
 
 //Main Session 4
 var GRP4 = "Session 4"
-rangeTime4 = input.session(title='Session Time', defval='1800-2200', group=GRP4)
+rangeTime4 = input.session(title='Session Time', defval='1800-2205', group=GRP4)
 sessLable4 = input.string(defval = "NEWYORK PM", title = "Name", group = GRP4)
 boxLineColor4 = input(color.red, 'Box and H/L Line Color', group=GRP4)
 middleLineColor4 = input(color.red, 'Middle Line Color', group=GRP4)
 bgColor4 = input(color.new(color.red, 90), 'Box Background Color', group=GRP4)
 
-drawSessionBox(rangeTime4, sessLable4, boxLineColor4, middleLineColor4, bgColor4)
+drawSessBox(rangeTime4, sessLable4, boxLineColor4, middleLineColor4, bgColor4)
