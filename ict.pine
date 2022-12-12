@@ -1,8 +1,8 @@
 //@version=5
 
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © Nephew_Sam_
-indicator('ICT PD Intraday', overlay=true, max_bars_back=1000, max_labels_count=200, max_lines_count=200, max_boxes_count=200)
+// © VitaHoang
+indicator('ICT Time Range', overlay=true, max_bars_back=1000, max_labels_count=500, max_lines_count=500, max_boxes_count=500)
 
 //––––––––––––––––––––CONSTANTS––––––––––––––––––––
 LABEL_OFFSET_Y = 5000
@@ -37,7 +37,7 @@ else
     "UTC+" + (hoursOffset < 10 ? "0" : na) + str.tostring(hoursOffset) + ":" + (minutesOffset == 0 ? "00" : "30")
 
 
-//––––––––––––––––––––TDO––––––––––––––––––––
+//––––––––––––––––––––TRUE DAILY OPEN––––––––––––––––––––
 // Inputs
 var grptdo = 'TDO Settings'
 tdoShow = input.bool(true, title='', inline='1', group=grptdo)
@@ -46,31 +46,34 @@ tdoColor = input.color(color.gray, title='', inline="1", group=grptdo)
 MAX_LINES = input.int(200, title='Max Lines to show', minval=0, maxval=200, group=grptdo)
 tdoOffset = input.int(0, "UTC Timezone offset (in hours)", minval = -12, maxval = 14, step = 1, tooltip = TOOLTIP01)
 
+// Functions
+markTimePrice(_hour,_minute,_second) =>
+    inTDO = hour == _hour-hoursOffset-tdoOffset and minute == _minute-minutesOffset and second == _second
+
+    var line[] tdoHline = array.new_line(0)
+    var line[] tdoVline = array.new_line(0)
+    var label[] tdoLabel = array.new_label(0)
+
+
+    if inTDO and not inTDO[1] and tdoShow
+        array.push(tdoHline, line.new(time, open, time + _24H, open, xloc=xloc.bar_time, color=tdoColor, style = line.style_solid, width=linesWidth))
+        array.push(tdoVline, line.new(time, open, time, close, xloc=xloc.bar_time, extend=extend.both,color=tdoColor, style = line.style_dashed, width=linesWidth))
+        if showLable
+            array.push(tdoLabel, label.new(time + _24H, open + open/LABEL_OFFSET_Y, tdoText, xloc=xloc.bar_time, style=label.style_none, size=labelSize, textcolor=tdoColor))
+        
+
+    // Delete lines if more than max
+    if array.size(tdoHline) > MAX_LINES
+        line.delete(array.shift(tdoHline))
+        line.delete(array.shift(tdoVline))
+        label.delete(array.shift(tdoLabel))
 
 
 // Main
-inTDO = hour == 5-hoursOffset-tdoOffset and minute == 0-minutesOffset and second == 0
-
-var line[] tdoHline = array.new_line(0)
-var line[] tdoVline = array.new_line(0)
-var label[] tdoLabel = array.new_label(0)
+markTimePrice(5,0,0)
 
 
-if inTDO and not inTDO[1] and tdoShow
-    array.push(tdoHline, line.new(time, open, time + _24H, open, xloc=xloc.bar_time, color=tdoColor, style = line.style_solid, width=linesWidth))
-    array.push(tdoVline, line.new(time, open, time, close, xloc=xloc.bar_time, extend=extend.both,color=tdoColor, style = line.style_dashed, width=linesWidth))
-    if showLable
-        array.push(tdoLabel, label.new(time + _24H, open + open/LABEL_OFFSET_Y, tdoText, xloc=xloc.bar_time, style=label.style_none, size=labelSize, textcolor=tdoColor))
-    
-
-// Delete lines if more than max
-if array.size(tdoHline) > MAX_LINES
-    line.delete(array.shift(tdoHline))
-    line.delete(array.shift(tdoVline))
-    label.delete(array.shift(tdoLabel))
-
-
-//––––––––––––––––––––SESSION––––––––––––––––––––
+//––––––––––––––––––––INTRADAY SESSION––––––––––––––––––––
 //Inputs
 var grpss = 'Session Settings'
 showLines = input(title='Show Lines ?', defval=true, group=grpss)
@@ -103,7 +106,7 @@ isTfBetweenMins(lowerMinute, upperMinute) =>
     timeframe.isintraday and timeframe.multiplier >= lowerMinute and timeframe.multiplier <= upperMinute
 
 
-drawSessBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
+drawSessBox (showSess, rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
     inSession = not na(time(timeframe.period, rangeTime, utcOffset))
     inExtend = not na(time(timeframe.period, rangeTime, utcOffset))
     startTime = 0
@@ -129,7 +132,7 @@ drawSessBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
         high_val
 
     // Plot lines
-    if inSession and isTfBetweenMins(1,59)
+    if inSession and isTfBetweenMins(1,59) and showSess
         if inSession[1]
             label.delete(sLable)
             line.delete(lowHline)
@@ -139,20 +142,20 @@ drawSessBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
             line.delete(middleHline)
             line.delete(openHline)
             box.delete(bgBox)
-            high_val
+            int(na)
 
         if low < low_val
             low_val := low
-            low_val
+            int(na)
         if high > high_val
             high_val := high
-            high_val
+            int(na)
 
         //Create Box
         //x1, y1, x2, y2
         if showBackground
             bgBox := fillSessBox(startTime, high_val, low_val, bgColor)
-            high_val
+            int(na)
 
         if showLines
             lowHline := drawSessHline(startTime, low_val, boxLineColor)
@@ -160,17 +163,17 @@ drawSessBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
             if showVlines
                 leftVline := drawSessVline(startTime, high_val, startTime, low_val)
                 rightVline := drawSessVline(time, high_val, time, low_val)
-                high_val
+                int(na)
             if showMiddleLine
                 middleHline := drawSessMline(startTime, high_val, low_val, middleLineColor)
-                high_val
+                int(na)
             if showOpenLine
                 openHline := drawSessHline(startTime, open_val, boxLineColor)
                 high_val
-            high_val
+            int(na)
         if showLable
             sLable := drawSessLabel(startTime, high_val, sessLable, boxLineColor)
-            high_val
+            int(na)
 
     else
         if inExtend and extendLines and not inSession and timeframe.isminutes
@@ -191,44 +194,134 @@ drawSessBox (rangeTime, sessLable, boxLineColor, middleLineColor, bgColor) =>
             price := line.get_y1(middleHline)
             line.delete(middleHline)
             middleHline := drawSessMline(time1, price, price, middleLineColor)
-            high_val
+            int(na)
 
 //Main Session 1
 var GRP1 = "Session 1"
+showSess1 = input.bool(defval = true, title = "Show Session?", group = GRP1)
 rangeTime1 = input.session(title='Session Time', defval='0000-0605', group=GRP1)
 sessLable1 = input.string(defval = "ASIA", title = "Name", group = GRP1) 
 boxLineColor1 = input(color.blue, 'Box and H/L Line Color', group=GRP1)
 middleLineColor1 = input(color.blue, 'Middle Line Color', group=GRP1)
 bgColor1 = input(color.new(color.aqua, 90), 'Box Background Color', group=GRP1)
 
-drawSessBox(rangeTime1, sessLable1, boxLineColor1, middleLineColor1, bgColor1)
+drawSessBox(showSess1, rangeTime1, sessLable1, boxLineColor1, middleLineColor1, bgColor1)
 
 //Main Session 2
 var GRP2 = "Session 2"
+showSess2 = input.bool(defval = true, title = "Show Session?", group = GRP2)
 rangeTime2 = input.session(title='Session Time', defval='0700-1605', group=GRP2)
 sessLable2 = input.string(defval = "LONDON", title = "Name", group = GRP2)
 boxLineColor2 = input(color.green, 'Box and H/L Line Color', group=GRP2)
 middleLineColor2 = input(color.green, 'Middle Line Color', group=GRP2)
 bgColor2 = input(color.new(color.green, 90), 'Box Background Color', group=GRP2)
 
-drawSessBox(rangeTime2, sessLable2, boxLineColor2, middleLineColor2, bgColor2)
+drawSessBox(showSess2, rangeTime2, sessLable2, boxLineColor2, middleLineColor2, bgColor2)
 
 //Main Session 3
 var GRP3 = "Session 3"
+showSess3 = input.bool(defval = true, title = "Show Session?", group = GRP3)
 rangeTime3 = input.session(title='Session Time', defval='1300-1705', group=GRP3)
 sessLable3 = input.string(defval = "NEWYORK AM", title = "Name", group = GRP3)
 boxLineColor3 = input(color.red, 'Box and H/L Line Color', group=GRP3)
 middleLineColor3 = input(color.red, 'Middle Line Color', group=GRP3)
 bgColor3 = input(color.new(color.red, 90), 'Box Background Color', group=GRP3)
 
-drawSessBox(rangeTime3, sessLable3, boxLineColor3, middleLineColor3, bgColor3)
+drawSessBox(showSess3, rangeTime3, sessLable3, boxLineColor3, middleLineColor3, bgColor3)
 
 //Main Session 4
 var GRP4 = "Session 4"
+showSess4 = input.bool(defval = true, title = "Show Session?", group = GRP4)
 rangeTime4 = input.session(title='Session Time', defval='1800-2205', group=GRP4)
 sessLable4 = input.string(defval = "NEWYORK PM", title = "Name", group = GRP4)
 boxLineColor4 = input(color.red, 'Box and H/L Line Color', group=GRP4)
 middleLineColor4 = input(color.red, 'Middle Line Color', group=GRP4)
 bgColor4 = input(color.new(color.red, 90), 'Box Background Color', group=GRP4)
 
-drawSessBox(rangeTime4, sessLable4, boxLineColor4, middleLineColor4, bgColor4)
+drawSessBox(showSess4, rangeTime4, sessLable4, boxLineColor4, middleLineColor4, bgColor4)
+
+//Main Session 5
+//var GRP5 = "Session 5"
+//showSess5 = input.bool(defval = true, title = "Show Session?", group = GRP5)    
+//rangeTime5 = input.session(title='Session Time', defval='0000-2345', group=GRP5)
+//sessLable5 = input.string(defval = "DAILY RANGE", title = "Name", group = GRP5)
+//boxLineColor5 = input(color.black, 'Box and H/L Line Color', group=GRP5)
+//middleLineColor5 = input(color.black, 'Middle Line Color', group=GRP5)
+//bgColor5 = input(color.new(color.black, 90), 'Box Background Color', group=GRP5)
+
+//drawSessBox(showSess5, rangeTime5, sessLable5, boxLineColor5, middleLineColor5, bgColor5)
+
+//––––––––––––––––––––WEEKLY/DAILY RANGE––––––––––––––––––––
+// Inputs
+var GRPW = 'Weekly Range Settings'
+showHtf = input.bool(true, title='Show HTF Range?', inline='1', group=GRPW)
+showHtfWeek = input.bool(true, title='Show Weekly Range?', inline='2', group=GRPW)
+colorHtfWeek = input.color(color.orange, title='', inline='2', group=GRPW)
+showHtfDay = input.bool(true, title='Show Daily Range?', inline='3', group=GRPW)
+colorHtfDay = input.color(color.gray, title='', inline='3', group=GRPW)
+
+
+
+string tfw = input.timeframe("W", "Timeframe")
+string tfd = input.timeframe("D", "Timeframe")
+
+
+// Functions
+
+drawWeekHline(_price, _color) =>
+    line.new(bar_index - 1, _price, bar_index, _price, xloc.bar_index, extend.none, _color, line.style_dashed, 1)
+
+
+drawHTF (tf, showTf, _color)=> 
+    var _H = float(na)
+    var _L = float(na)
+    var _O = float(na)
+    var line weekH = na
+    var line weekL = na
+    var line weekO = na
+    // Detect changes in timeframe.
+    bool newTF = ta.change(time(tf))
+    if showTf
+        if newTF
+            _H := high
+            _L := low
+            _O := open
+            weekH := drawWeekHline(high, _color)
+            weekL := drawWeekHline(low, _color)
+            weekO := drawWeekHline(open, _color)
+
+            // Remove extend of the old range
+            line.set_extend(weekH[1], extend.none)
+            line.set_extend(weekL[1], extend.none)
+            line.set_extend(weekO[1], extend.none)
+            int(na)
+
+        // Extend line of the current range
+        if newTF[1]
+            line.set_extend(weekH, extend.right)
+            line.set_extend(weekL, extend.right)
+            line.set_extend(weekO, extend.right)
+            int(na)
+
+        else
+            if high > _H
+                _H := high
+                int(na)
+            if low < _L
+                _L := low
+                int(na)
+            line.set_y1(weekH, _H)
+            line.set_xy2(weekH, bar_index, _H)
+            line.set_y1(weekL, _L)
+            line.set_xy2(weekL, bar_index, _L)
+            line.set_x2(weekO, bar_index)
+            int(na)
+
+// Weekly Range
+if showHtf
+    drawHTF(tfw, showHtfWeek, colorHtfWeek)
+
+// Daily Range
+if showHtf
+    drawHTF(tfd, showHtfDay, colorHtfDay)
+
