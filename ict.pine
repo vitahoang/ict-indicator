@@ -1,8 +1,7 @@
 //@version=5
-
 // This source code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // © VitaHoang
-indicator('ICT Time Range', overlay=true, max_bars_back=1000, max_labels_count=500, max_lines_count=500, max_boxes_count=500)
+indicator('ICT Time Range', overlay=true, max_bars_back=500, max_labels_count=500, max_lines_count=500, max_boxes_count=500)
 
 //––––––––––––––––––––CONSTANTS––––––––––––––––––––
 LABEL_OFFSET_Y = 5000
@@ -23,12 +22,13 @@ print(txt) =>
 //––––––––––––––––––––INPUTS––––––––––––––––––––
 
 var grps = 'Main Settings'
+showSession = input.bool(defval = true, title = "Show Session?", group = grps) 
+showLable = input.bool(defval = true, title = "Show Lable?", group = grps) 
+hoursOffset = input.int(0, "Timezone offset (hrs)", minval = -12, maxval = 14, step = 1, tooltip = TOOLTIP01)
+minutesOffset = input.int(0, "Timezone offset (mins)", minval = 0, maxval = 30, step = 30, tooltip = TOOLTIP01)
 linesWidth = input.int(1, title='Lines Width', minval=1, maxval=4, group=grps)
 _labelSize = input.string("Small", title='Label Size', options=['Auto', 'Tiny', 'Small', 'Normal', 'Huge'], group=grps)
 labelSize = _labelSize == "auto" ? size.auto : _labelSize == "Tiny" ? size.tiny : _labelSize == "Small" ? size.small : _labelSize == "Normal" ? size.normal : size.huge
-showLable = input.bool(defval = true, title = "Show Lable?", group = grps) 
-hoursOffset = input.int(0, "UTC Timezone offset (in hours)", minval = -12, maxval = 14, step = 1, tooltip = TOOLTIP01)
-minutesOffset = input.int(0, "UTC Timezone offset (in minutes)", minval = 0, maxval = 30, step = 30, tooltip = TOOLTIP01)
 
 int msOffset = hoursOffset * _1H + minutesOffset * _1M
 string utcOffset = if hoursOffset < 0
@@ -36,6 +36,79 @@ string utcOffset = if hoursOffset < 0
 else
     "UTC+" + (hoursOffset < 10 ? "0" : na) + str.tostring(hoursOffset) + ":" + (minutesOffset == 0 ? "00" : "30")
 
+//––––––––––––––––––––HTF RANGE––––––––––––––––––––
+// Inputs
+var GRPW = 'HTF Range Settings'
+showHtf = input.bool(true, title='Show HTF Range?', inline='1', group=GRPW)
+showHtfWeek = input.bool(true, title='Show Weekly Range?', inline='2', group=GRPW)
+colorHtfWeek = input.color(color.orange, title='', inline='2', group=GRPW)
+showHtfDay = input.bool(true, title='Show Daily Range?', inline='3', group=GRPW)
+colorHtfDay = input.color(color.gray, title='', inline='3', group=GRPW)
+
+
+
+string tfw = input.timeframe("W", "Timeframe")
+string tfd = input.timeframe("D", "Timeframe")
+
+
+// Functions
+
+drawWeekHline(_price, _color) =>
+    line.new(bar_index - 1, _price, bar_index, _price, xloc.bar_index, extend.none, _color, line.style_dotted, 1)
+
+
+drawHTF (tf, showTf, _color)=> 
+    var _H = float(na)
+    var _L = float(na)
+    var _O = float(na)
+    var line weekH = na
+    var line weekL = na
+    var line weekO = na
+    // Detect changes in timeframe.
+    bool newTF = ta.change(time(tf))
+    if showTf
+        if newTF
+            _H := high
+            _L := low
+            _O := open
+            weekH := drawWeekHline(high, _color)
+            weekL := drawWeekHline(low, _color)
+            weekO := drawWeekHline(open, _color)
+
+            // Remove extend of the old range
+            line.set_extend(weekH[1], extend.none)
+            line.set_extend(weekL[1], extend.none)
+            line.set_extend(weekO[1], extend.none)
+            int(na)
+
+        // Extend line of the current range
+        if newTF[1]
+            line.set_extend(weekH, extend.right)
+            line.set_extend(weekL, extend.right)
+            line.set_extend(weekO, extend.right)
+            int(na)
+
+        else
+            if high > _H
+                _H := high
+                int(na)
+            if low < _L
+                _L := low
+                int(na)
+            line.set_y1(weekH, _H)
+            line.set_xy2(weekH, bar_index, _H)
+            line.set_y1(weekL, _L)
+            line.set_xy2(weekL, bar_index, _L)
+            line.set_x2(weekO, bar_index)
+            int(na)
+
+// Weekly Range
+if showHtf
+    drawHTF(tfw, showHtfWeek, colorHtfWeek)
+
+// Daily Range
+if showHtf
+    drawHTF(tfd, showHtfDay, colorHtfDay)
 
 //––––––––––––––––––––TRUE DAILY OPEN––––––––––––––––––––
 // Inputs
@@ -43,7 +116,7 @@ var grptdo = 'TDO Settings'
 tdoShow = input.bool(true, title='', inline='1', group=grptdo)
 tdoText = input.string("TDO", title='', inline='1', group=grptdo)
 tdoColor = input.color(color.gray, title='', inline="1", group=grptdo)
-MAX_LINES = input.int(200, title='Max Lines to show', minval=0, maxval=200, group=grptdo)
+MAX_LINES = input.int(300, title='Max Lines to show', minval=0, maxval=500, group=grptdo)
 tdoOffset = input.int(0, "UTC Timezone offset (in hours)", minval = -12, maxval = 14, step = 1, tooltip = TOOLTIP01)
 
 // Functions
@@ -56,17 +129,17 @@ markTimePrice(_hour,_minute,_second) =>
 
 
     if inTDO and not inTDO[1] and tdoShow
-        array.push(tdoHline, line.new(time, open, time + _24H, open, xloc=xloc.bar_time, color=tdoColor, style = line.style_solid, width=linesWidth))
-        array.push(tdoVline, line.new(time, open, time, close, xloc=xloc.bar_time, extend=extend.both,color=tdoColor, style = line.style_dashed, width=linesWidth))
+        array.push(tdoHline, line.new(time, open, time + _24H, open, xloc=xloc.bar_time, color=tdoColor, style = line.style_dotted, width=linesWidth))
+        array.push(tdoVline, line.new(time, open, time, close, xloc=xloc.bar_time, extend=extend.both,color=tdoColor, style = line.style_dotted, width=linesWidth))
         if showLable
             array.push(tdoLabel, label.new(time + _24H, open + open/LABEL_OFFSET_Y, tdoText, xloc=xloc.bar_time, style=label.style_none, size=labelSize, textcolor=tdoColor))
         
-
     // Delete lines if more than max
     if array.size(tdoHline) > MAX_LINES
         line.delete(array.shift(tdoHline))
+        // label.delete(array.shift(tdoLabel))
+    if array.size(tdoVline) > MAX_LINES
         line.delete(array.shift(tdoVline))
-        label.delete(array.shift(tdoLabel))
 
 
 // Main
@@ -132,7 +205,7 @@ drawSessBox (showSess, rangeTime, sessLable, boxLineColor, middleLineColor, bgCo
         high_val
 
     // Plot lines
-    if inSession and isTfBetweenMins(1,59) and showSess
+    if showSession and inSession and isTfBetweenMins(1,59) and showSess
         if inSession[1]
             label.delete(sLable)
             line.delete(lowHline)
@@ -250,78 +323,3 @@ drawSessBox(showSess4, rangeTime4, sessLable4, boxLineColor4, middleLineColor4, 
 //bgColor5 = input(color.new(color.black, 90), 'Box Background Color', group=GRP5)
 
 //drawSessBox(showSess5, rangeTime5, sessLable5, boxLineColor5, middleLineColor5, bgColor5)
-
-//––––––––––––––––––––WEEKLY/DAILY RANGE––––––––––––––––––––
-// Inputs
-var GRPW = 'Weekly Range Settings'
-showHtf = input.bool(true, title='Show HTF Range?', inline='1', group=GRPW)
-showHtfWeek = input.bool(true, title='Show Weekly Range?', inline='2', group=GRPW)
-colorHtfWeek = input.color(color.orange, title='', inline='2', group=GRPW)
-showHtfDay = input.bool(true, title='Show Daily Range?', inline='3', group=GRPW)
-colorHtfDay = input.color(color.gray, title='', inline='3', group=GRPW)
-
-
-
-string tfw = input.timeframe("W", "Timeframe")
-string tfd = input.timeframe("D", "Timeframe")
-
-
-// Functions
-
-drawWeekHline(_price, _color) =>
-    line.new(bar_index - 1, _price, bar_index, _price, xloc.bar_index, extend.none, _color, line.style_dashed, 1)
-
-
-drawHTF (tf, showTf, _color)=> 
-    var _H = float(na)
-    var _L = float(na)
-    var _O = float(na)
-    var line weekH = na
-    var line weekL = na
-    var line weekO = na
-    // Detect changes in timeframe.
-    bool newTF = ta.change(time(tf))
-    if showTf
-        if newTF
-            _H := high
-            _L := low
-            _O := open
-            weekH := drawWeekHline(high, _color)
-            weekL := drawWeekHline(low, _color)
-            weekO := drawWeekHline(open, _color)
-
-            // Remove extend of the old range
-            line.set_extend(weekH[1], extend.none)
-            line.set_extend(weekL[1], extend.none)
-            line.set_extend(weekO[1], extend.none)
-            int(na)
-
-        // Extend line of the current range
-        if newTF[1]
-            line.set_extend(weekH, extend.right)
-            line.set_extend(weekL, extend.right)
-            line.set_extend(weekO, extend.right)
-            int(na)
-
-        else
-            if high > _H
-                _H := high
-                int(na)
-            if low < _L
-                _L := low
-                int(na)
-            line.set_y1(weekH, _H)
-            line.set_xy2(weekH, bar_index, _H)
-            line.set_y1(weekL, _L)
-            line.set_xy2(weekL, bar_index, _L)
-            line.set_x2(weekO, bar_index)
-            int(na)
-
-// Weekly Range
-if showHtf
-    drawHTF(tfw, showHtfWeek, colorHtfWeek)
-
-// Daily Range
-if showHtf
-    drawHTF(tfd, showHtfDay, colorHtfDay)
-
